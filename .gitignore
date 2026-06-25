@@ -1,0 +1,34 @@
+#测试代码
+test_block1.py
+test_block2.py
+test_block3.py
+test_block4.py
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+
+# 环境配置（含 API Key）
+.env
+*.env
+
+# 数据库和缓存
+*.db
+chroma_db/
+test_chroma_db/
+
+# 模型权重（太大）
+model_weights/
+
+# 上传的文件
+uploaded_files/
+test_files/
+
+# IDE
+.vscode/
+.idea/
