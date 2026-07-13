@@ -22,10 +22,14 @@ class DocumentParser:
         
         if ext == ".pdf":
             return self._parse_pdf(file_path)
+        elif ext == ".md":
+            return self._parse_md(file_path)
+        elif ext == ".docx":
+            return self._parse_docx(file_path)
         elif ext == ".txt":
             return self._parse_txt(file_path)
         else:
-            raise ValueError(f"不支持的文件格式: {ext}，仅支持 PDF/TXT")
+            raise ValueError(f"不支持的文件格式: {ext}，仅支持 PDF/TXT/Markdown/Word")
     
     def _parse_pdf(self, file_path: str) -> List[Dict[str, any]]:
         """解析 PDF，按页返回"""
@@ -45,6 +49,35 @@ class DocumentParser:
                         "source": os.path.basename(file_path)
                     })
         return pages
+
+    def _parse_md(self, file_path: str) -> List[Dict[str, any]]:
+        """解析 Markdown"""
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
+        # 去掉Markdown标记，保留纯文本
+        text = re.sub(r'[#*`_\[\]\(\)!]', '', text)
+        return [{
+            "text": text.strip(),
+            "page": 1,
+            "source": os.path.basename(file_path)
+        }]
+
+    def _parse_docx(self, file_path: str) -> List[Dict[str, any]]:
+        """解析 Word"""
+        try:
+            import docx
+        except ImportError:
+            raise ImportError("请安装 python-docx: pip install python-docx")
+        
+        doc = docx.Document(file_path)
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+        text = "\n".join(paragraphs)
+        
+        return [{
+            "text": text.strip(),
+            "page": 1,
+            "source": os.path.basename(file_path)
+        }]
     
     def _parse_txt(self, file_path: str) -> List[Dict[str, any]]:
         """解析 TXT，按行返回（模拟单页）"""

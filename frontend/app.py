@@ -32,9 +32,9 @@ with st.sidebar:
     
     # 上传文件
     uploaded_file = st.file_uploader(
-        "上传文档（PDF/TXT）",
-        type=["pdf", "txt"],
-        help="支持 PDF 和 TXT 格式"
+        "上传文档（PDF/TXT/MD/DOCX）",
+        type=["pdf", "txt","md","docx"],
+        help="支持 PDF、TXT、Markdown和Word 格式"
     )
     
     if uploaded_file is not None:

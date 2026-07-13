@@ -21,7 +21,7 @@ async def upload_document(file: UploadFile = File(...)):
     上传文档（PDF/TXT），解析切分后存入向量库
     """
     # 1. 验证文件类型
-    allowed_ext = {".pdf", ".txt"}
+    allowed_ext = {".pdf", ".txt", ".md", ".docx"}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in allowed_ext:
         raise HTTPException(
