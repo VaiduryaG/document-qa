@@ -10,7 +10,8 @@ import os
 
 # ========== 配置 ==========
 API_BASE_URL = "http://localhost:8000"
-UPLOAD_ENDPOINT = f"{API_BASE_URL}/upload/"
+UPLOAD_ENDPOINT = f"{API_BASE_URL}/upload/"             # 单文件上传（保留兼容）
+UPLOAD_BATCH_ENDPOINT = f"{API_BASE_URL}/upload/batch"  # 批量上传（多选/拖拽）
 CHAT_ENDPOINT = f"{API_BASE_URL}/chat/"
 DOCS_ENDPOINT = f"{API_BASE_URL}/documents/"
 
@@ -29,26 +30,61 @@ st.caption("基于 RAG 技术，上传文档即可智能问答")
 # ========== 侧边栏：文档管理 ==========
 with st.sidebar:
     st.header("📁 文档管理")
-    
+
+    # 「清空选择」状态：key 变化时 Streamlit 会重建组件，等于清空已选文件。
+    # 上传完成后 _update_uploader_key +1，下一帧 file_uploader 是全新空队列，
+    # 避免「已解析文件还留在选择框里，下次不注意重复上传」的问题
+    if "_uploader_key" not in st.session_state:
+        st.session_state._uploader_key = 0
+
     # 上传文件
-    uploaded_file = st.file_uploader(
-        "上传文档（PDF/TXT/MD/DOCX）",
-        type=["pdf", "txt","md","docx"],
-        help="支持 PDF、TXT、Markdown和Word 格式"
+    # accept_multiple_files=True 开启多选；st.file_uploader 本身自带
+    # 拖拽投放区（Drag and drop），多选开启后即可一次拖入多个文件
+    uploaded_files = st.file_uploader(
+        "上传文档（可多选 / 拖拽到此处）",
+        type=["pdf", "txt", "md", "docx", "jpg", "jpeg", "png"],
+        accept_multiple_files=True,   # 关键：允许多文件（同时支持拖入多个）
+        help="支持 PDF（含扫描件）/TXT/Markdown/Word/图片，可一次选择或拖入多个文件",
+        key=f"uploader_{st.session_state._uploader_key}",  # 换 key = 清空选择
     )
-    
-    if uploaded_file is not None:
+
+    if uploaded_files:
+        st.caption(f"已选择 {len(uploaded_files)} 个文件：")
+        for f in uploaded_files:
+            st.text(f"📄 {f.name}")
+
+        # 手动清空按钮（不upload也要能主动清掉选错的文件）
+        clear_clicked = st.button("🧹 清空选择", use_container_width=True)
+        if clear_clicked:
+            st.session_state._uploader_key += 1
+            st.rerun()
+
         if st.button("📤 上传并解析", use_container_width=True):
-            with st.spinner("正在解析文档..."):
-                files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+            # 组装多文件表单：files 字段传 (name, bytes) 列表
+            multipart = [
+                ("files", (f.name, f.getvalue())) for f in uploaded_files
+            ]
+            with st.spinner(f"正在解析 {len(uploaded_files)} 个文件（扫描件OCR较慢，请耐心等待）..."):
                 try:
-                    response = requests.post(UPLOAD_ENDPOINT, files=files, timeout=60)
+                    response = requests.post(
+                        UPLOAD_BATCH_ENDPOINT, files=multipart, timeout=300
+                    )
                     if response.status_code == 200:
                         data = response.json()
-                        st.success(f"✅ 上传成功！切分为 {data['chunks']} 个片段")
+                        # 逐文件展示结果（成功/失败隔离）
+                        for item in data["results"]:
+                            if item["status"] == "success":
+                                st.success(f"✅ {item['filename']}（{item['chunks']} 个片段）")
+                            else:
+                                st.error(f"❌ {item['filename']}：{item['message']}")
+                        st.info(f"批量上传完成：成功 {data['succeeded']} / 失败 {data['failed']} / 共 {data['total']}")
+                        # 上传流程结束即清空选择队列：
+                        # - 成功的文件已在库里，留着只会造成误重传
+                        # - 失败的文件重试前往往需要先处理（换格式等），也应重新选择
+                        st.session_state._uploader_key += 1
                         st.rerun()
                     else:
-                        st.error(f"上传失败: {response.json().get('detail', '未知错误')}")
+                        st.error(f"批量上传失败: {response.json().get('detail', '未知错误')}")
                 except Exception as e:
                     st.error(f"请求失败: {str(e)}")
     
