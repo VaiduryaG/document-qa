@@ -4,8 +4,8 @@ import os
 from dotenv import load_dotenv
 
 
-# 加载 core/.env
-_env_path = os.path.join(os.path.dirname(__file__), ".env")
+# 加载项目根目录 .env
+_env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(_env_path)
 
 

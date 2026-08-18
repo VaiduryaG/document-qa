@@ -1,9 +1,12 @@
 import os
 from dotenv import load_dotenv
 
+from core.logger import get_logger
 
-# 加载 core/.env
-_env_path = os.path.join(os.path.dirname(__file__), ".env")
+logger = get_logger(__name__)
+
+# 加载项目根目录 .env
+_env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(_env_path)
 
 
@@ -23,10 +26,10 @@ def get_embedder():
     
     if embedder_type == "local":
         from core.local_embedder import LocalEmbedder
-        print("[Embedder工厂] 模式: 本地模型 (paraphrase-multilingual-MiniLM-L12-v2)")
+        logger.info("嵌入模式: 本地模型 (paraphrase-multilingual-MiniLM-L12-v2)")
         return LocalEmbedder()
-    
+
     # 默认智谱API
     from core.embedder import ZhipuEmbedder
-    print("[Embedder工厂] 模式: 智谱API (embedding-2)")
+    logger.info("嵌入模式: 智谱API (embedding-2)")
     return ZhipuEmbedder()

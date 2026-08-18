@@ -2,6 +2,10 @@ import os
 from sentence_transformers import SentenceTransformer
 from typing import List
 
+from core.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class LocalEmbedder:
     """
@@ -21,7 +25,7 @@ class LocalEmbedder:
                 "paraphrase-multilingual-MiniLM-L12-v2"
             )
         
-        print(f"加载本地模型路径: {model_path}")
+        logger.info("加载本地模型: %s", model_path)
         
         if not os.path.exists(model_path):
             raise FileNotFoundError(
@@ -32,7 +36,7 @@ class LocalEmbedder:
         
         self.model = SentenceTransformer(model_path)
         self.dimension = self.model.get_sentence_embedding_dimension()
-        print(f"✅ 模型加载完成，输出维度: {self.dimension}")
+        logger.info("本地模型加载完成 | 输出维度=%s", self.dimension)
     
     def embed(self, texts: List[str]) -> List[List[float]]:
         """批量文本转向量"""
