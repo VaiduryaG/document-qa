@@ -4,6 +4,20 @@ test_block2.py
 test_block3.py
 test_block4.py
 test_parser.py
+test_ocr.py
+test_parser_ocr.py
+test_upload_ocr.py
+test_sqlite_store.py
+test_repositories.py
+test_documents_api.py
+test_upload_ledger.py
+test_schemas.py
+test_chat_history.py
+test_logger.py
+test_main_global.py
+test_api_logging.py
+test_upload_batch.py
+test_reupload_idempotent.py
 test.docx
 test.md
 
@@ -22,8 +36,13 @@ venv/
 
 # 数据库和缓存
 *.db
+*.db-wal
+*.db-shm
 chroma_db/
 test_chroma_db/
+# 日志（阶段3）
+logs/
+test_logs/
 
 # 模型权重（太大）
 model_weights/
