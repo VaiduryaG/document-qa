@@ -89,6 +89,22 @@ class ChromaStore:
     def delete(self, ids: List[str]) -> None:
         """删除指定文档"""
         self.collection.delete(ids=ids)
+
+    def delete_by_filename(self, filename: str) -> int:
+        """
+        按文件名删除该文档的全部向量（where 过滤删除）。
+
+        用途：同名文件重传前先清旧向量。若旧次切出 8 块、新次只切出 5 块，
+        只靠 add（同 ID 静默跳过）会残留旧的第 6/7/8 块——先整删再新增才干净。
+
+        返回：
+            int：删除前的该文件向量条数（0 表示本来没有）。
+        """
+        existed = self.collection.get(where={"filename": filename})
+        n = len(existed.get("ids", [])) if existed else 0
+        if n:
+            self.collection.delete(where={"filename": filename})
+        return n
     
     def get_all(self) -> Dict:
         """获取集合中所有文档"""
