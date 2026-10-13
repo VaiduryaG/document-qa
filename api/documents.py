@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, HTTPException
 
 from models.schemas import DocumentListResponse, DocumentInfo
+from core.hybrid_retriever import get_bm25_index
 from db.chroma_client import get_chroma_store
 from db import repositories as repo
 from core.logger import get_logger
@@ -78,6 +79,8 @@ async def delete_document(filename: str):
     # 1. 删除向量（若存在）
     if ids_to_delete:
         store.delete(ids_to_delete)
+        # BM25 索引失效（混合检索用，下次检索自动重建）
+        get_bm25_index().invalidate()
 
     # 2. 删除 SQLite 台账行（返回实际删除行数，0 也容错）
     deleted_rows = repo.delete_document(filename)

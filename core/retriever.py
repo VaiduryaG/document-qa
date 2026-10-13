@@ -13,7 +13,7 @@ class DocumentRetriever:
         self,
         embedder=None,
         vector_store: ChromaStore = None,
-        top_k: int = 3
+        top_k: int = 4
     ):
         self.embedder = embedder or get_embedder()
         self.vector_store = vector_store or get_chroma_store()
@@ -77,7 +77,7 @@ class DocumentRetriever:
 
 def retrieve_relevant_chunks(
     query: str,
-    top_k: int = 3,
+    top_k: int = 4,
     filter_dict: Optional[Dict] = None
 ) -> List[Dict]:
     """便捷函数"""

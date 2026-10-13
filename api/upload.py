@@ -6,6 +6,7 @@ from models.schemas import UploadResponse, BatchUploadItem, BatchUploadResponse
 from core.parser import parse_document
 from core.chunker import chunk_document
 from core.embedder_factory import get_embedder
+from core.hybrid_retriever import get_bm25_index
 from db.chroma_client import get_chroma_store
 from db import repositories as repo
 from core.logger import get_logger
@@ -106,6 +107,9 @@ async def upload_document(file: UploadFile = File(...)):
             embeddings=embeddings,
             metadatas=metadatas
         )
+
+        # 6.2 BM25 索引失效（混合检索用，下次检索自动重建）
+        get_bm25_index().invalidate()
 
         # 7. 写 SQLite 台账（阶段 2.4）
         #    登记文件名/片段数/上传时间，供 /documents/ 列表读取。

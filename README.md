@@ -1,3 +1,6 @@
+# 快速启动
+uvicorn main:app --reload --port 8000
+streamlit run frontend/app.py
 # 文件结构
 document-qa/
 ├── main.py                 # FastAPI入口

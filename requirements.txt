@@ -12,3 +12,6 @@ sniffio
 # 阶段一：OCR 能力（图片 + 扫描型 PDF）
 rapidocr-onnxruntime   # OCR 引擎，自带 ONNX 模型权重，支持中英文
 pymupdf                # PDF 渲染为图像，供 OCR 使用（无 ImageMagick 系统依赖）
+# 阶段四：混合检索
+rank-bm25              # BM25 关键词检索算法
+jieba                  # 中文分词（BM25 分词用）

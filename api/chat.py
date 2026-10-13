@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 from models.schemas import ChatRequest, ChatResponse, Source
-from core.retriever import DocumentRetriever
+from core.hybrid_retriever import HybridRetriever
 from core.prompt_builder import PromptBuilder
 from core.llm import get_llm
 from db import repositories as repo
@@ -53,8 +53,8 @@ async def chat(request: ChatRequest):
         # 用户表也顺手登记（幂等），台账完整
         repo.ensure_user(request.user_id or "default")
 
-        # 1. 检索相关 chunk（基于本轮问题，逻辑同旧版）
-        retriever = DocumentRetriever(top_k=request.top_k)
+        # 1. 混合检索相关 chunk（向量语义 + BM25 关键词，RRF 融合，Round 4 优化）
+        retriever = HybridRetriever(top_k=request.top_k)
         chunks = retriever.retrieve(request.question)
 
         # 2. 构建 Prompt

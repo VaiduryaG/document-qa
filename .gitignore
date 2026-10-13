@@ -1,27 +1,32 @@
-#测试代码
-test_block1.py
-test_block2.py
-test_block3.py
-test_block4.py
-test_parser.py
-test_ocr.py
-test_parser_ocr.py
-test_upload_ocr.py
-test_sqlite_store.py
-test_repositories.py
-test_documents_api.py
-test_upload_ledger.py
-test_schemas.py
-test_chat_history.py
-test_logger.py
-test_main_global.py
-test_api_logging.py
-test_upload_batch.py
-test_reupload_idempotent.py
-test.docx
-test.md
+# ==================== 测试/实验区（不进生产） ====================
 
-# Python
+# 测试目录
+tests/
+tests_dev/
+ocr_analysis/
+test_documents/
+test_files/
+
+# 评估流水线（非系统运行必需）
+evaluation/
+
+# 实验记录与报告（eval 产物，本地留存）
+EXPERIMENTS.md
+OPTIMIZATION_LOG.md
+docs/baseline/
+docs/实验数据/
+
+# 学习笔记文档
+docs/代码导读_七大模块.md
+docs/项目总体导读.md
+
+# 根目录测试脚本
+test_*.py
+test.md
+test.docx
+
+# ==================== Python ====================
+
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,27 +35,52 @@ __pycache__/
 env/
 venv/
 
-# 环境配置（含 API Key）
-.env
-*.env
+# ==================== 环境配置 ====================
 
-# 数据库和缓存
+.env
+
+# ==================== 数据库和缓存 ====================
+
+# 向量数据库
+chroma_db/
+test_chroma_db/
+chroma_db_test_*/
+
+# SQLite：运行时数据库与 WAL 文件
 *.db
 *.db-wal
 *.db-shm
-chroma_db/
-test_chroma_db/
-# 日志（阶段3）
+
+# ==================== 日志 ====================
+
 logs/
 test_logs/
 
-# 模型权重（太大）
+# ==================== 模型权重 ====================
+
 model_weights/
 
-# 上传的文件
-uploaded_files/
-test_files/
+# ==================== 上传文件 ====================
 
-# IDE
+uploaded_files/
+
+# ==================== IDE ====================
+
 .vscode/
 .idea/
+
+# ==================== 临时脚本 ====================
+
+clean.sh
+/tmp/
+
+# ==================== 操作系统 ====================
+
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ==================== Jupyter Notebook ====================
+
+.ipynb_checkpoints/
