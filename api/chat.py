@@ -90,7 +90,10 @@ async def chat(request: ChatRequest):
                 content=c["content"],
                 page=c["page"],
                 source=c["source"],
-                score=c["score"]
+                score=c["score"],
+                is_table=bool(c.get("is_table", False)),
+                table_index=c.get("table_index"),
+                table_row_index=c.get("table_row_index")
             )
             for c in chunks
         ]

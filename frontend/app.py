@@ -74,7 +74,10 @@ with st.sidebar:
                         # 逐文件展示结果（成功/失败隔离）
                         for item in data["results"]:
                             if item["status"] == "success":
-                                st.success(f"✅ {item['filename']}（{item['chunks']} 个片段）")
+                                st.success(
+                                    f"✅ {item['filename']}（{item['chunks']} 个片段，"
+                                    f"{item.get('tables', 0)} 个表格）"
+                                )
                             else:
                                 st.error(f"❌ {item['filename']}：{item['message']}")
                         st.info(f"批量上传完成：成功 {data['succeeded']} / 失败 {data['failed']} / 共 {data['total']}")
@@ -104,6 +107,26 @@ with st.sidebar:
                     with col1:
                         st.text(f"📄 {doc['filename']}")
                         st.caption(f"{doc['chunks']} 个片段")
+                        with st.expander("📋 查看解析表格"):
+                            try:
+                                tables_resp = requests.get(
+                                    f"{DOCS_ENDPOINT}{doc['filename']}/tables",
+                                    timeout=10
+                                )
+                                if tables_resp.status_code == 200:
+                                    tables_data = tables_resp.json()
+                                    if not tables_data.get("tables"):
+                                        st.info("未解析到表格")
+                                    for table in tables_data.get("tables", []):
+                                        st.caption(
+                                            f"表格{table['table_index'] + 1} | "
+                                            f"第{table['page']}页 | {len(table['rows'])} 行"
+                                        )
+                                        st.json(table)
+                                else:
+                                    st.info("未解析到表格")
+                            except Exception as e:
+                                st.error(f"读取表格失败: {str(e)}")
                     with col2:
                         if st.button("🗑️", key=f"del_{doc['id']}"):
                             try:
@@ -140,10 +163,15 @@ for message in st.session_state.messages:
         if message["role"] == "assistant" and "sources" in message:
             with st.expander("📎 查看来源"):
                 for i, src in enumerate(message["sources"], 1):
-                    st.markdown(
-                        f"**来源 {i}** | `{src['source']}` 第{src['page']}页 "
-                        f"(相关度: {src['score']:.2f})"
-                    )
+                    source_label = f"**来源 {i}** | `{src['source']}` 第{src['page']}页"
+                    if src.get("is_table"):
+                        table_index = src.get("table_index")
+                        row_index = src.get("table_row_index")
+                        source_label += (
+                            f" | 表格{table_index + 1 if table_index is not None else '?'}"
+                            f"第{row_index + 1 if row_index is not None else '?'}行"
+                        )
+                    st.markdown(f"{source_label} (相关度: {src['score']:.2f})")
                     st.info(src["content"][:300] + "...")
 
 # 用户输入
@@ -176,10 +204,15 @@ if question := st.chat_input("请输入你的问题..."):
                     if sources:
                         with st.expander("📎 查看来源"):
                             for i, src in enumerate(sources, 1):
-                                st.markdown(
-                                    f"**来源 {i}** | `{src['source']}` 第{src['page']}页 "
-                                    f"(相关度: {src['score']:.2f})"
-                                )
+                                source_label = f"**来源 {i}** | `{src['source']}` 第{src['page']}页"
+                                if src.get("is_table"):
+                                    table_index = src.get("table_index")
+                                    row_index = src.get("table_row_index")
+                                    source_label += (
+                                        f" | 表格{table_index + 1 if table_index is not None else '?'}"
+                                        f"第{row_index + 1 if row_index is not None else '?'}行"
+                                    )
+                                st.markdown(f"{source_label} (相关度: {src['score']:.2f})")
                                 st.info(src["content"][:300] + "...")
                     
                     # 保存到历史

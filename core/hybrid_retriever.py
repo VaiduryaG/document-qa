@@ -124,6 +124,9 @@ class BM25Index:
                 "page": meta.get("page", 1),
                 "source": meta.get("source", "unknown"),
                 "chunk_index": meta.get("chunk_index", 0),
+                "is_table": bool(meta.get("is_table", False)),
+                "table_index": int(meta["table_index"]) if meta.get("table_index", -1) >= 0 else None,
+                "table_row_index": int(meta["table_row_index"]) if meta.get("table_row_index", -1) >= 0 else None,
                 "bm25_score": round(float(score), 4),
             })
         return results
@@ -219,6 +222,9 @@ class HybridRetriever:
                 "page": chunk["page"],
                 "source": chunk["source"],
                 "chunk_index": chunk.get("chunk_index", 0),
+                "is_table": bool(chunk.get("is_table", False)),
+                "table_index": chunk.get("table_index"),
+                "table_row_index": chunk.get("table_row_index"),
                 "score": round(score * RRF_K, 4),  # 放大便于观察（非真实相似度）
                 "vec_rank": chunk.get("vec_rank"),
                 "bm25_rank": chunk.get("bm25_rank"),

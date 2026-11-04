@@ -7,6 +7,7 @@ class UploadResponse(BaseModel):
     message: str
     filename: str
     chunks: int
+    tables: int = 0
     status: str = "success"
 
 
@@ -15,6 +16,7 @@ class BatchUploadItem(BaseModel):
     filename: str
     status: str              # "success" / "failed"
     chunks: int = 0          # 失败时为 0
+    tables: int = 0          # 失败时为 0
     message: str = ""        # 失败原因 / 成功提示
 
 
@@ -51,6 +53,9 @@ class Source(BaseModel):
     page: int
     source: str
     score: float
+    is_table: bool = False
+    table_index: Optional[int] = None
+    table_row_index: Optional[int] = None
 
 
 class ChatResponse(BaseModel):
@@ -70,6 +75,26 @@ class DocumentInfo(BaseModel):
     filename: str
     chunks: int
     uploaded_at: Optional[str] = None
+
+
+class DocumentTable(BaseModel):
+    """文档解析出的结构化表格"""
+    id: int
+    filename: str
+    page: int
+    table_index: int
+    parser: str
+    headers: List[str]
+    rows: List[Dict]
+    bbox: Optional[List[float]] = None
+    created_at: Optional[str] = None
+
+
+class DocumentTablesResponse(BaseModel):
+    """文档表格解析结果"""
+    filename: str
+    tables: List[DocumentTable]
+    total: int
 
 
 class DocumentListResponse(BaseModel):

@@ -13,6 +13,7 @@ OCR 引擎封装模块
 """
 
 import threading
+from typing import Dict, List, Union
 from typing import Optional, Union
 
 import numpy as np
@@ -113,20 +114,42 @@ class OCREngine:
               - elapse : 各阶段耗时统计，此处不使用。
             当图像无法解码或无任何文本框时 result 为 None。
         """
+        items = self.extract_items(image)
+        return "\n".join(item["text"] for item in items).strip()
+
+    def extract_items(self, image: Union[bytes, np.ndarray, str]) -> List[Dict]:
+        """
+        对一张图像执行 OCR，返回带坐标的结构化文本框。
+
+        RapidOCR 原始结果中每一项是 [box, text, score]；box 是四个角点坐标。
+        表格解析依赖这些坐标判断“哪些文本在同一行、哪些文本在同一列”。
+        """
         try:
             result, _elapse = self._ocr(image)
         except Exception:
-            # 解码失败等异常不应中断整个解析流程，记日志（含堆栈）后返回空串
-            logger.exception("OCR 识别异常，返回空文本 | 输入类型=%s", type(image).__name__)
-            return ""
+            logger.exception("OCR 识别异常，返回空结构 | 输入类型=%s", type(image).__name__)
+            return []
 
-        # 无文本框 / 全程未识别到内容
         if not result:
-            return ""
+            return []
 
-        # result 每项: [box, text, score]，取 text 拼接
-        lines = [item[1] for item in result if item and len(item) >= 2]
-        return "\n".join(lines).strip()
+        items = []
+        for item in result:
+            if not item or len(item) < 2:
+                continue
+            text = str(item[1]).strip()
+            if not text:
+                continue
+            bbox = None
+            if len(item) > 2 and item[0]:
+                bbox = [[float(point[0]), float(point[1])] for point in item[0]]
+
+            items.append({
+                "text": text,
+                "bbox": bbox,
+                "confidence": float(item[2]) if len(item) > 2 else 0.0,
+            })
+        return items
 
 
 # ========== 单例便捷入口 ==========

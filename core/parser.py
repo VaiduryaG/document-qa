@@ -27,6 +27,16 @@ class DocumentParser:
     # 渲染 PDF 页面的 DPI：150 兼顾清晰度与速度（300 更清晰但慢 4 倍）
     OCR_RENDER_DPI = 150
 
+    @staticmethod
+    def _empty_page(file_path: str, page_num: int) -> Dict[str, any]:
+        return {
+            "text": "",
+            "page": page_num,
+            "source": os.path.basename(file_path),
+            "ocr_items": [],
+            "pdf_tables": [],
+        }
+
     def parse(self, file_path: str) -> List[Dict[str, any]]:
         """
         根据文件扩展名自动选择解析器
@@ -70,26 +80,33 @@ class DocumentParser:
         pages = []
         with pdfplumber.open(file_path) as pdf:
             for i, page in enumerate(pdf.pages, start=1):
+                parsed_page = self._empty_page(file_path, i)
                 text = page.extract_text()
                 text = text.strip() if text else ""
 
+                try:
+                    parsed_page["pdf_tables"] = page.extract_tables() or []
+                except Exception:
+                    logger.exception(
+                        "PDF 原生表格抽取失败 | 文件=%s | 页码=%s", file_path, i
+                    )
+                    parsed_page["pdf_tables"] = []
+
                 # 抽不到足够文字 → 疑似扫描页，走 OCR 兜底
                 if len(text) < self.OCR_MIN_TEXT_LEN:
-                    ocr_text = self._ocr_pdf_page(file_path, i)
-                    if ocr_text:
-                        text = ocr_text
+                    ocr_items = self._ocr_pdf_page(file_path, i)
+                    if ocr_items:
+                        text = "\n".join(item["text"] for item in ocr_items)
+                        parsed_page["ocr_items"] = ocr_items
                     else:
                         # OCR 也没识别出内容，跳过该页，不留空块
                         continue
 
-                pages.append({
-                    "text": text,
-                    "page": i,
-                    "source": os.path.basename(file_path)
-                })
+                parsed_page["text"] = text
+                pages.append(parsed_page)
         return pages
 
-    def _ocr_pdf_page(self, file_path: str, page_num: int) -> str:
+    def _ocr_pdf_page(self, file_path: str, page_num: int) -> List[Dict[str, any]]:
         """
         用 PyMuPDF 把 PDF 指定页渲染成 PNG 图像，再交给 RapidOCR 识别。
 
@@ -98,7 +115,7 @@ class DocumentParser:
             page_num  : 页码（1-based，与 pdfplumber enumerate 的 i 一致）
 
         返回：
-            str：识别出的文本；失败或无文字返回 ""。
+            list[dict]：带坐标和置信度的 OCR 文本框；失败返回空列表。
 
         说明：
             PyMuPDF 的页码是 0-based，这里传入前减 1 转换。
@@ -123,11 +140,11 @@ class DocumentParser:
             doc.close()
 
             # OCR 引擎接收 bytes 输入，返回拼接文本
-            return get_ocr_engine().extract(png_bytes)
+            return get_ocr_engine().extract_items(png_bytes)
         except Exception as e:
             # OCR 单页失败不应中断整篇解析，记日志（含堆栈）后返回空串，该页被跳过
             logger.exception("PDF 第%s页 OCR 失败，该页跳过 | 文件=%s", page_num, file_path)
-            return ""
+            return []
 
     def _parse_image(self, file_path: str) -> List[Dict[str, any]]:
         """
@@ -137,17 +154,18 @@ class DocumentParser:
         """
         from core.ocr import get_ocr_engine
 
-        text = get_ocr_engine().extract(file_path)
-        text = text.strip() if text else ""
-
-        if not text:
+        items = get_ocr_engine().extract_items(file_path)
+        if not items:
             # 图片无任何可识别文字，返回空列表（不上传空内容）
             return []
 
+        text = "\n".join(item["text"] for item in items).strip()
         return [{
             "text": text,
             "page": 1,
-            "source": os.path.basename(file_path)
+            "source": os.path.basename(file_path),
+            "ocr_items": items,
+            "pdf_tables": []
         }]
 
     def _parse_md(self, file_path: str) -> List[Dict[str, any]]:

@@ -57,6 +57,33 @@ CREATE TABLE IF NOT EXISTS documents (
     uploaded_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))  -- 上传时间
 );
 
+-- 表格元数据表：一个表格一行，保存解析出的表头和表格边界。
+CREATE TABLE IF NOT EXISTS document_tables (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename     TEXT    NOT NULL,
+    page         INTEGER NOT NULL,
+    table_index  INTEGER NOT NULL,
+    parser       TEXT    NOT NULL DEFAULT 'ocr_layout',
+    headers_json TEXT    NOT NULL DEFAULT '[]',
+    rows_json    TEXT    NOT NULL DEFAULT '[]',
+    bbox_json    TEXT,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(filename, page, table_index)
+);
+
+-- 表格行表：按行保存“字段-值”和单元格证据，用于精确问答与审查展示。
+CREATE TABLE IF NOT EXISTS table_rows (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename     TEXT    NOT NULL,
+    page         INTEGER NOT NULL,
+    table_index  INTEGER NOT NULL,
+    row_index    INTEGER NOT NULL,
+    data_json    TEXT    NOT NULL DEFAULT '{}',
+    cells_json   TEXT    NOT NULL DEFAULT '[]',
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(filename, page, table_index, row_index)
+);
+
 -- 对话表：一轮会话一个 conversation（同一用户可开多个对话）
 CREATE TABLE IF NOT EXISTS conversations (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,6 +106,9 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at);
 -- 文档表辅助索引：按用户列文档是高频查询
 CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+-- 表格读取索引：前端按文档展示解析表格
+CREATE INDEX IF NOT EXISTS idx_document_tables_file ON document_tables(filename, page, table_index);
+CREATE INDEX IF NOT EXISTS idx_table_rows_file ON table_rows(filename, page, table_index, row_index);
 """
 
 

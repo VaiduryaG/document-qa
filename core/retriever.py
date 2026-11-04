@@ -13,7 +13,7 @@ class DocumentRetriever:
         self,
         embedder=None,
         vector_store: ChromaStore = None,
-        top_k: int = 4
+        top_k: int = 3
     ):
         self.embedder = embedder or get_embedder()
         self.vector_store = vector_store or get_chroma_store()
@@ -69,6 +69,9 @@ class DocumentRetriever:
                 "page": meta.get("page", 1),
                 "source": meta.get("source", "unknown"),
                 "chunk_index": meta.get("chunk_index", 0),
+                "is_table": bool(meta.get("is_table", False)),
+                "table_index": int(meta["table_index"]) if meta.get("table_index", -1) >= 0 else None,
+                "table_row_index": int(meta["table_row_index"]) if meta.get("table_row_index", -1) >= 0 else None,
                 "score": round(score, 4)
             })
         
@@ -77,7 +80,7 @@ class DocumentRetriever:
 
 def retrieve_relevant_chunks(
     query: str,
-    top_k: int = 4,
+    top_k: int = 3,
     filter_dict: Optional[Dict] = None
 ) -> List[Dict]:
     """便捷函数"""

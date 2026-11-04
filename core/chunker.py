@@ -18,23 +18,54 @@ class TextChunker:
         self.overlap = overlap
         self.min_chunk_size = min_chunk_size
     
-    def chunk(self, pages: List[Dict[str, any]]) -> List[Dict[str, any]]:
+    def chunk(
+        self,
+        pages: List[Dict[str, any]],
+        tables: List[Dict[str, any]] = None
+    ) -> List[Dict[str, any]]:
         """
         将解析后的页面切分为 chunk
         
         Args:
             pages: [{"text": "...", "page": 1, "source": "xxx.pdf"}, ...]
+            tables: table_parser.parse_tables() 返回的结构化表格列表。
         
         Returns:
             [{"content": "...", "page": 1, "chunk_index": 0, "source": "xxx.pdf"}, ...]
         """
         all_chunks = []
         chunk_index = 0
+        tables_by_page = {}
+        for table in tables or []:
+            tables_by_page.setdefault(int(table.get("page", 1)), []).append(table)
         
         for page in pages:
             page_text = page["text"]
             page_num = page["page"]
             source = page["source"]
+
+            # 表格先按业务行切分，保证“字段-值”关系不被滑动窗口破坏。
+            for table in tables_by_page.get(page_num, []):
+                for row in table.get("rows", []):
+                    row_text = "；".join(
+                        f"{key}：{value}"
+                        for key, value in row.get("data", {}).items()
+                        if str(value).strip()
+                    )
+                    if not row_text:
+                        continue
+
+                    all_chunks.append({
+                        "content": f"表格数据。{row_text}",
+                        "page": page_num,
+                        "chunk_index": chunk_index,
+                        "source": source,
+                        "is_table": True,
+                        "table_index": int(table.get("table_index", 0)),
+                        "table_row_index": int(row.get("row_index", 0)),
+                        "table_parser": table.get("parser", "ocr_layout"),
+                    })
+                    chunk_index += 1
             
             # 按句子切分（中文按。！？；，英文按 .!?）
             sentences = self._split_sentences(page_text)
@@ -101,7 +132,11 @@ class TextChunker:
         return chunks
 
 
-def chunk_document(pages: List[Dict[str, any]], **kwargs) -> List[Dict[str, any]]:
+def chunk_document(
+    pages: List[Dict[str, any]],
+    tables: List[Dict[str, any]] = None,
+    **kwargs
+) -> List[Dict[str, any]]:
     """便捷函数"""
     chunker = TextChunker(**kwargs)
-    return chunker.chunk(pages)
+    return chunker.chunk(pages, tables=tables)

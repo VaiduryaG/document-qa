@@ -2,7 +2,7 @@ import os
 
 from fastapi import APIRouter, HTTPException
 
-from models.schemas import DocumentListResponse, DocumentInfo
+from models.schemas import DocumentListResponse, DocumentInfo, DocumentTablesResponse
 from core.hybrid_retriever import get_bm25_index
 from db.chroma_client import get_chroma_store
 from db import repositories as repo
@@ -85,6 +85,9 @@ async def delete_document(filename: str):
     # 2. 删除 SQLite 台账行（返回实际删除行数，0 也容错）
     deleted_rows = repo.delete_document(filename)
 
+    # 2.1 删除结构化表格和表格行（表格解析新增的证据层数据）
+    deleted_tables = repo.delete_document_tables(filename)
+
     # 3. 删除本地文件（存在才删）
     file_path = os.path.join("uploaded_files", filename)
     file_removed = False
@@ -102,5 +105,24 @@ async def delete_document(filename: str):
         "message": f"已删除文档: {filename}",
         "deleted_chunks": len(ids_to_delete),
         "deleted_db_rows": deleted_rows,   # 新增：清理的台账行数（0/1）
+        "deleted_tables": deleted_tables,
         "file_removed": file_removed       # 新增：本地文件是否删除（缺文件时 False）
     }
+
+
+@router.get("/{filename}/tables", response_model=DocumentTablesResponse)
+async def list_document_tables(filename: str):
+    """
+    列出某篇文档解析出的结构化表格。
+
+    该接口用于前端展示“表格结构还原”结果，也可作为审查模块的数据源。
+    """
+    tables = repo.list_document_tables(filename)
+    if not tables:
+        raise HTTPException(status_code=404, detail=f"文档没有解析出的表格: {filename}")
+
+    return DocumentTablesResponse(
+        filename=filename,
+        tables=tables,
+        total=len(tables)
+    )

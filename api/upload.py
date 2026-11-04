@@ -5,6 +5,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from models.schemas import UploadResponse, BatchUploadItem, BatchUploadResponse
 from core.parser import parse_document
 from core.chunker import chunk_document
+from core.table_parser import parse_tables
 from core.embedder_factory import get_embedder
 from core.hybrid_retriever import get_bm25_index
 from db.chroma_client import get_chroma_store
@@ -65,7 +66,13 @@ async def upload_document(file: UploadFile = File(...)):
             )
 
         # 4. 切分 chunk
-        chunks = chunk_document(pages, chunk_size=500, overlap=50)
+        tables = parse_tables(pages)
+        chunks = chunk_document(
+            pages,
+            tables=tables,
+            chunk_size=500,
+            overlap=50
+        )
 
         # 切分后为空（如文字总量不足 min_chunk_size）同样拒绝入库
         if not chunks:
@@ -98,7 +105,11 @@ async def upload_document(file: UploadFile = File(...)):
             "page": c["page"],
             "source": c["source"],
             "chunk_index": c["chunk_index"],
-            "filename": file.filename
+            "filename": file.filename,
+            "is_table": bool(c.get("is_table", False)),
+            "table_index": int(c.get("table_index", -1)),
+            "table_row_index": int(c.get("table_row_index", -1)),
+            "table_parser": c.get("table_parser", "")
         } for c in chunks]
 
         store.add(
@@ -123,16 +134,20 @@ async def upload_document(file: UploadFile = File(...)):
             user_id="default"  # 预留多用户；当前单用户固定 default
         )
 
+        # 表格是审查/精确问答的证据层，必须和文档台账一起落库。
+        saved_table_count = repo.replace_document_tables(file.filename, tables)
+
         # 成功：一行结构化日志，含页数/片段数等关键指标，运营排查有据可查
         logger.info(
-            "上传入库成功 | 文件=%s | 页数=%d | 片段数=%d",
-            file.filename, len(pages), len(chunks)
+            "上传入库成功 | 文件=%s | 页数=%d | 片段数=%d | 表格数=%d",
+            file.filename, len(pages), len(chunks), saved_table_count
         )
 
         return UploadResponse(
             message="文档上传成功",
             filename=file.filename,
-            chunks=len(chunks)
+            chunks=len(chunks),
+            tables=saved_table_count
         )
 
     except HTTPException:
@@ -177,6 +192,7 @@ async def upload_batch(files: List[UploadFile] = File(...)):
                 filename=resp.filename,
                 status="success",
                 chunks=resp.chunks,
+                tables=resp.tables,
                 message=resp.message,
             ))
             succeeded += 1

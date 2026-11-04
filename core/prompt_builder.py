@@ -46,8 +46,15 @@ class PromptBuilder:
         # 构建上下文
         context_parts = []
         for i, chunk in enumerate(retrieved_chunks, start=1):
+            source_label = f"来源：{chunk['source']} 第{chunk['page']}页"
+            if chunk.get("is_table"):
+                table_index = chunk.get("table_index")
+                row_index = chunk.get("table_row_index")
+                source_label += f"，表格{table_index + 1 if table_index is not None else '?'}"
+                if row_index is not None:
+                    source_label += f"第{row_index + 1}行"
             context_parts.append(
-                f"[片段{i}] 来源：{chunk['source']} 第{chunk['page']}页\n"
+                f"[片段{i}] {source_label}\n"
                 f"{chunk['content']}"
             )
         

@@ -16,7 +16,8 @@
     - 查询类函数不修改数据；写操作底层已加线程锁（见 sqlite_store.execute）
 """
 
-from typing import List, Dict, Optional
+import json
+from typing import Any, List, Dict, Optional
 
 from db.sqlite_store import get_sqlite_store
 
@@ -124,6 +125,99 @@ def delete_document(filename: str) -> int:
         (filename,)
     )
     return cur.rowcount
+
+
+# ================= 文档表格 =================
+
+def replace_document_tables(filename: str, tables: List[Dict[str, Any]]) -> int:
+    """
+    全量替换一篇文档解析出的表格和表格行。
+
+    Args:
+        filename: 文档文件名。
+        tables: table_parser.parse_tables() 返回的结构化表格列表。
+
+    Returns:
+        int: 保存的表格数量。
+    """
+    store = get_sqlite_store()
+    store.execute("DELETE FROM table_rows WHERE filename = ?", (filename,))
+    store.execute("DELETE FROM document_tables WHERE filename = ?", (filename,))
+
+    for table in tables:
+        store.execute(
+            """
+            INSERT INTO document_tables (
+                filename, page, table_index, parser,
+                headers_json, rows_json, bbox_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                filename,
+                int(table.get("page", 1)),
+                int(table.get("table_index", 0)),
+                table.get("parser", "ocr_layout"),
+                json.dumps(table.get("headers", []), ensure_ascii=False),
+                json.dumps(table.get("rows", []), ensure_ascii=False),
+                json.dumps(table.get("bbox"), ensure_ascii=False)
+                if table.get("bbox") is not None else None,
+            ),
+        )
+
+        for row in table.get("rows", []):
+            store.execute(
+                """
+                INSERT INTO table_rows (
+                    filename, page, table_index, row_index,
+                    data_json, cells_json
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    filename,
+                    int(table.get("page", 1)),
+                    int(table.get("table_index", 0)),
+                    int(row.get("row_index", 0)),
+                    json.dumps(row.get("data", {}), ensure_ascii=False),
+                    json.dumps(row.get("cells", []), ensure_ascii=False),
+                ),
+            )
+
+    return len(tables)
+
+
+def list_document_tables(filename: str) -> List[Dict[str, Any]]:
+    """列出某篇文档解析出的全部结构化表格。"""
+    store = get_sqlite_store()
+    rows = store.query(
+        """
+        SELECT id, filename, page, table_index, parser,
+               headers_json, rows_json, bbox_json, created_at
+        FROM document_tables
+        WHERE filename = ?
+        ORDER BY page ASC, table_index ASC
+        """,
+        (filename,),
+    )
+
+    tables = []
+    for row in rows:
+        item = dict(row)
+        item["headers"] = json.loads(item.pop("headers_json") or "[]")
+        item["rows"] = json.loads(item.pop("rows_json") or "[]")
+        bbox_text = item.pop("bbox_json", None)
+        item["bbox"] = json.loads(bbox_text) if bbox_text else None
+        tables.append(item)
+    return tables
+
+
+def delete_document_tables(filename: str) -> int:
+    """删除一篇文档关联的全部表格和表格行，返回删除的表格数量。"""
+    store = get_sqlite_store()
+    store.execute("DELETE FROM table_rows WHERE filename = ?", (filename,))
+    cursor = store.execute(
+        "DELETE FROM document_tables WHERE filename = ?", (filename,)
+    )
+    return cursor.rowcount
 
 
 # ================= 对话 =================
