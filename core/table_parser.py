@@ -214,6 +214,49 @@ def _parse_ocr_table(
     if not rows:
         return None
 
+    named_columns = [index for index in selected_column_indexes if not headers[index].startswith("列")]
+    auto_columns = [index for index in selected_column_indexes if headers[index].startswith("列")]
+    merge_targets = {}
+    for auto_index in auto_columns:
+        if not named_columns:
+            break
+        target_index = min(
+            named_columns,
+            key=lambda index: abs(columns[index]["center"] - columns[auto_index]["center"]),
+        )
+        merge_targets[auto_index] = target_index
+
+    if merge_targets:
+        for row in rows:
+            for auto_index, target_index in merge_targets.items():
+                auto_name, target_name = headers[auto_index], headers[target_index]
+                auto_text = row["data"].get(auto_name, "")
+                target_text = row["data"].get(target_name, "")
+                if auto_text:
+                    row["data"][target_name] = f"{target_text} {auto_text}".strip()
+                row["data"].pop(auto_name, None)
+
+                auto_cell = next(
+                    (cell for cell in row["cells"] if cell.get("column") == auto_name),
+                    None,
+                )
+                target_cell = next(
+                    (cell for cell in row["cells"] if cell.get("column") == target_name),
+                    None,
+                )
+                if auto_cell and auto_cell.get("text"):
+                    if target_cell:
+                        target_cell["text"] = f"{target_cell.get('text', '')} {auto_cell['text']}".strip()
+                        target_cell["bbox"] = target_cell.get("bbox") or auto_cell.get("bbox")
+                        target_cell["confidence"] = target_cell.get("confidence") or auto_cell.get("confidence")
+                    else:
+                        row["cells"].append(auto_cell)
+                if target_cell:
+                    target_cell["column"] = target_name
+                row["cells"] = [cell for cell in row["cells"] if cell.get("column") != auto_name]
+
+        selected_column_indexes = [index for index in selected_column_indexes if index not in merge_targets]
+
     # 去掉 OCR 对齐产生的空列；只有自动命名且整列无值时才移除。
     removable_indexes = [
         index
