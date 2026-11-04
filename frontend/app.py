@@ -76,7 +76,9 @@ with st.sidebar:
                             if item["status"] == "success":
                                 st.success(
                                     f"✅ {item['filename']}（{item['chunks']} 个片段，"
-                                    f"{item.get('tables', 0)} 个表格）"
+                                    f"{item.get('tables', 0)} 个表格，"
+                                    f"{item.get('fields', 0)} 个字段，"
+                                    f"{item.get('issues', 0)} 个审查问题）"
                                 )
                             else:
                                 st.error(f"❌ {item['filename']}：{item['message']}")
@@ -127,6 +129,41 @@ with st.sidebar:
                                     st.info("未解析到表格")
                             except Exception as e:
                                 st.error(f"读取表格失败: {str(e)}")
+
+                        with st.expander("🔍 查看字段与审查"):
+                            try:
+                                fields_resp = requests.get(
+                                    f"{DOCS_ENDPOINT}{doc['filename']}/fields",
+                                    timeout=10
+                                )
+                                review_resp = requests.get(
+                                    f"{DOCS_ENDPOINT}{doc['filename']}/review",
+                                    timeout=10
+                                )
+                                fields = fields_resp.json().get("fields", [])
+                                issues = review_resp.json().get("issues", [])
+                                if not fields:
+                                    st.info("未抽取到关键字段")
+                                for field in fields:
+                                    st.caption(
+                                        f"第{field['page']}页 / 表格{field['table_index'] + 1} / "
+                                        f"第{field['row_index'] + 1}行 | {field['field_name']}：{field['value']}"
+                                    )
+                                if not issues:
+                                    st.success("未发现基础审查问题")
+                                for issue in issues:
+                                    icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(
+                                        issue["severity"], "ℹ️"
+                                    )
+                                    st.write(
+                                        f"{icon} {issue['message']} "
+                                        f"（第{issue['page']}页 / 表格{issue['table_index'] + 1} / "
+                                        f"第{issue['row_index'] + 1 if issue['row_index'] >= 0 else '?'}行）"
+                                    )
+                                    if issue.get("evidence"):
+                                        st.json(issue["evidence"])
+                            except Exception as e:
+                                st.error(f"读取审查结果失败: {str(e)}")
                     with col2:
                         if st.button("🗑️", key=f"del_{doc['id']}"):
                             try:

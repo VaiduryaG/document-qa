@@ -220,6 +220,123 @@ def delete_document_tables(filename: str) -> int:
     return cursor.rowcount
 
 
+# ================= 字段抽取与审查 =================
+
+def replace_document_review(
+    filename: str,
+    fields: List[Dict[str, Any]],
+    issues: List[Dict[str, Any]]
+) -> tuple[int, int]:
+    """全量替换一篇文档的字段抽取结果和审查问题。"""
+    store = get_sqlite_store()
+    store.execute("DELETE FROM document_fields WHERE filename = ?", (filename,))
+    store.execute("DELETE FROM document_review_issues WHERE filename = ?", (filename,))
+
+    for field in fields:
+        store.execute(
+            """
+            INSERT INTO document_fields (
+                filename, page, table_index, row_index,
+                field_type, field_name, value, column_name, evidence_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                filename,
+                int(field.get("page", 1)),
+                int(field.get("table_index", 0)),
+                int(field.get("row_index", 0)),
+                field.get("field_type", ""),
+                field.get("field_name", ""),
+                field.get("value", ""),
+                field.get("column", ""),
+                json.dumps(field.get("evidence", {}), ensure_ascii=False),
+            ),
+        )
+
+    for issue in issues:
+        store.execute(
+            """
+            INSERT INTO document_review_issues (
+                filename, page, table_index, row_index,
+                rule_id, severity, message, column_name, evidence_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                filename,
+                int(issue.get("page", 1)),
+                int(issue.get("table_index", 0)),
+                int(issue.get("row_index", -1)),
+                issue.get("rule_id", ""),
+                issue.get("severity", "info"),
+                issue.get("message", ""),
+                issue.get("column", ""),
+                json.dumps(issue.get("evidence", {}), ensure_ascii=False),
+            ),
+        )
+
+    return len(fields), len(issues)
+
+
+def list_document_fields(filename: str) -> List[Dict[str, Any]]:
+    """列出某篇文档抽取出的关键字段。"""
+    store = get_sqlite_store()
+    rows = store.query(
+        """
+        SELECT id, filename, page, table_index, row_index,
+               field_type, field_name, value, column_name,
+               evidence_json, created_at
+        FROM document_fields
+        WHERE filename = ?
+        ORDER BY page ASC, table_index ASC, row_index ASC, id ASC
+        """,
+        (filename,),
+    )
+
+    fields = []
+    for row in rows:
+        item = dict(row)
+        item["evidence"] = json.loads(item.pop("evidence_json") or "{}")
+        fields.append(item)
+    return fields
+
+
+def list_document_review_issues(filename: str) -> List[Dict[str, Any]]:
+    """列出某篇文档的基础审查问题。"""
+    store = get_sqlite_store()
+    rows = store.query(
+        """
+        SELECT id, filename, page, table_index, row_index,
+               rule_id, severity, message, column_name,
+               evidence_json, created_at
+        FROM document_review_issues
+        WHERE filename = ?
+        ORDER BY
+            CASE severity WHEN 'error' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+            page ASC, table_index ASC, row_index ASC, id ASC
+        """,
+        (filename,),
+    )
+
+    issues = []
+    for row in rows:
+        item = dict(row)
+        item["evidence"] = json.loads(item.pop("evidence_json") or "{}")
+        issues.append(item)
+    return issues
+
+
+def delete_document_review(filename: str) -> tuple[int, int]:
+    """删除一篇文档的字段和审查问题，返回 (字段数, 问题数)。"""
+    store = get_sqlite_store()
+    field_cursor = store.execute(
+        "DELETE FROM document_fields WHERE filename = ?", (filename,)
+    )
+    issue_cursor = store.execute(
+        "DELETE FROM document_review_issues WHERE filename = ?", (filename,)
+    )
+    return field_cursor.rowcount, issue_cursor.rowcount
+
+
 # ================= 对话 =================
 
 def ensure_conversation(

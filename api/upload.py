@@ -6,6 +6,7 @@ from models.schemas import UploadResponse, BatchUploadItem, BatchUploadResponse
 from core.parser import parse_document
 from core.chunker import chunk_document
 from core.table_parser import parse_tables
+from core.reviewer import review_tables
 from core.embedder_factory import get_embedder
 from core.hybrid_retriever import get_bm25_index
 from db.chroma_client import get_chroma_store
@@ -67,6 +68,7 @@ async def upload_document(file: UploadFile = File(...)):
 
         # 4. 切分 chunk
         tables = parse_tables(pages)
+        fields, review_issues = review_tables(tables)
         chunks = chunk_document(
             pages,
             tables=tables,
@@ -136,18 +138,26 @@ async def upload_document(file: UploadFile = File(...)):
 
         # 表格是审查/精确问答的证据层，必须和文档台账一起落库。
         saved_table_count = repo.replace_document_tables(file.filename, tables)
+        saved_field_count, saved_issue_count = repo.replace_document_review(
+            file.filename,
+            fields,
+            review_issues
+        )
 
         # 成功：一行结构化日志，含页数/片段数等关键指标，运营排查有据可查
         logger.info(
-            "上传入库成功 | 文件=%s | 页数=%d | 片段数=%d | 表格数=%d",
-            file.filename, len(pages), len(chunks), saved_table_count
+            "上传入库成功 | 文件=%s | 页数=%d | 片段数=%d | 表格数=%d | 字段数=%d | 问题数=%d",
+            file.filename, len(pages), len(chunks), saved_table_count,
+            saved_field_count, saved_issue_count
         )
 
         return UploadResponse(
             message="文档上传成功",
             filename=file.filename,
             chunks=len(chunks),
-            tables=saved_table_count
+            tables=saved_table_count,
+            fields=saved_field_count,
+            issues=saved_issue_count
         )
 
     except HTTPException:
@@ -193,6 +203,8 @@ async def upload_batch(files: List[UploadFile] = File(...)):
                 status="success",
                 chunks=resp.chunks,
                 tables=resp.tables,
+                fields=resp.fields,
+                issues=resp.issues,
                 message=resp.message,
             ))
             succeeded += 1

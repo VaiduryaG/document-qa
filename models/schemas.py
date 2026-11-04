@@ -8,6 +8,8 @@ class UploadResponse(BaseModel):
     filename: str
     chunks: int
     tables: int = 0
+    fields: int = 0
+    issues: int = 0
     status: str = "success"
 
 
@@ -17,6 +19,8 @@ class BatchUploadItem(BaseModel):
     status: str              # "success" / "failed"
     chunks: int = 0          # 失败时为 0
     tables: int = 0          # 失败时为 0
+    fields: int = 0          # 失败时为 0
+    issues: int = 0          # 失败时为 0
     message: str = ""        # 失败原因 / 成功提示
 
 
@@ -94,6 +98,20 @@ class DocumentTablesResponse(BaseModel):
     """文档表格解析结果"""
     filename: str
     tables: List[DocumentTable]
+    total: int
+
+
+class DocumentFieldsResponse(BaseModel):
+    """文档关键字段抽取结果"""
+    filename: str
+    fields: List[Dict]
+    total: int
+
+
+class DocumentReviewResponse(BaseModel):
+    """文档基础审查结果"""
+    filename: str
+    issues: List[Dict]
     total: int
 
 

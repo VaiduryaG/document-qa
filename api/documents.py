@@ -2,7 +2,10 @@ import os
 
 from fastapi import APIRouter, HTTPException
 
-from models.schemas import DocumentListResponse, DocumentInfo, DocumentTablesResponse
+from models.schemas import (
+    DocumentListResponse, DocumentInfo, DocumentTablesResponse,
+    DocumentFieldsResponse, DocumentReviewResponse
+)
 from core.hybrid_retriever import get_bm25_index
 from db.chroma_client import get_chroma_store
 from db import repositories as repo
@@ -88,6 +91,9 @@ async def delete_document(filename: str):
     # 2.1 删除结构化表格和表格行（表格解析新增的证据层数据）
     deleted_tables = repo.delete_document_tables(filename)
 
+    # 2.2 删除字段抽取和审查结果，避免台账残留
+    deleted_fields, deleted_issues = repo.delete_document_review(filename)
+
     # 3. 删除本地文件（存在才删）
     file_path = os.path.join("uploaded_files", filename)
     file_removed = False
@@ -106,6 +112,8 @@ async def delete_document(filename: str):
         "deleted_chunks": len(ids_to_delete),
         "deleted_db_rows": deleted_rows,   # 新增：清理的台账行数（0/1）
         "deleted_tables": deleted_tables,
+        "deleted_fields": deleted_fields,
+        "deleted_issues": deleted_issues,
         "file_removed": file_removed       # 新增：本地文件是否删除（缺文件时 False）
     }
 
@@ -126,3 +134,17 @@ async def list_document_tables(filename: str):
         tables=tables,
         total=len(tables)
     )
+
+
+@router.get("/{filename}/fields", response_model=DocumentFieldsResponse)
+async def list_document_fields(filename: str):
+    """列出某篇文档抽取出的关键字段。"""
+    fields = repo.list_document_fields(filename)
+    return DocumentFieldsResponse(filename=filename, fields=fields, total=len(fields))
+
+
+@router.get("/{filename}/review", response_model=DocumentReviewResponse)
+async def list_document_review(filename: str):
+    """列出某篇文档的基础审查问题。"""
+    issues = repo.list_document_review_issues(filename)
+    return DocumentReviewResponse(filename=filename, issues=issues, total=len(issues))

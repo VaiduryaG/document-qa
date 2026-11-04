@@ -109,6 +109,41 @@ CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 -- 表格读取索引：前端按文档展示解析表格
 CREATE INDEX IF NOT EXISTS idx_document_tables_file ON document_tables(filename, page, table_index);
 CREATE INDEX IF NOT EXISTS idx_table_rows_file ON table_rows(filename, page, table_index, row_index);
+
+-- 字段抽取结果：按表格行保存关键字段及其证据
+CREATE TABLE IF NOT EXISTS document_fields (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename     TEXT    NOT NULL,
+    page         INTEGER NOT NULL,
+    table_index  INTEGER NOT NULL,
+    row_index    INTEGER NOT NULL,
+    field_type   TEXT    NOT NULL,
+    field_name   TEXT    NOT NULL,
+    value        TEXT    NOT NULL,
+    column_name  TEXT    NOT NULL,
+    evidence_json TEXT   NOT NULL DEFAULT '{}',
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(filename, page, table_index, row_index, field_type, field_name)
+);
+
+-- 基础审查问题：缺失字段、日期异常、金额不一致、重复编号等
+CREATE TABLE IF NOT EXISTS document_review_issues (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename     TEXT    NOT NULL,
+    page         INTEGER NOT NULL,
+    table_index  INTEGER NOT NULL,
+    row_index    INTEGER NOT NULL DEFAULT -1,
+    rule_id      TEXT    NOT NULL,
+    severity     TEXT    NOT NULL CHECK(severity IN ('error','warning','info')),
+    message      TEXT    NOT NULL,
+    column_name  TEXT    NOT NULL DEFAULT '',
+    evidence_json TEXT   NOT NULL DEFAULT '{}',
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(filename, rule_id, page, table_index, row_index, message)
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_fields_file ON document_fields(filename, page, table_index, row_index);
+CREATE INDEX IF NOT EXISTS idx_document_review_file ON document_review_issues(filename, severity, page, table_index, row_index);
 """
 
 
